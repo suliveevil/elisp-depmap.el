@@ -48,9 +48,7 @@ More info at the https://graphviz.org/doc/info/attrs.html website."
   "Find all source files from DIRECTORY, otherwise defer to `default-directory'."
   (let ((dir (or directory default-directory)))
     (--map (replace-regexp-in-string (format "^%s" dir) "" it)  ;; replace main directory
-           (--filter (and (string-suffix-p ".el" it)            ;; don't want elc
-                          (not (string-match-p "\\#" it)))      ;; don't want temp
-                     (directory-files-recursively dir ".*\\.el")))))
+           (directory-files-recursively dir "[^#].*\\.el$"))))
 
 ;; ;; -- Not sure if this needs to be used. It could be useful for checking
 ;; ;;    import loops.
