@@ -31,7 +31,9 @@
 (require 'paren)
 
 (defcustom elisp-depmap-parse-function-shapes
-  '((setq . underline) (defvar . underline) (defcustom . plain) (defun . tab) (defsubst . component) (defmacro . trapezium) (defgeneric . trapezium) (defmethod . trapezium))
+  '((setq . underline) (setq-local . underline)
+	(defvar . underline) (defvar-local . underline)
+	(defcustom . plain) (defun . tab) (defsubst . component) (defmacro . trapezium) (defgeneric . trapezium) (defmethod . trapezium))
   "Define variables to look, and the graphviz shapes they should take.
 More info at the https://graphviz.org/doc/info/attrs.html website."
   :type 'list
@@ -84,43 +86,30 @@ More info at the https://graphviz.org/doc/info/attrs.html website."
 ;;           (error "Unable to find provides for file %s" file))))))
 
 (defun elisp-depmap-parse--alltopdefs-file (file hashdefs)
-  "Get all top definitions in FILE and put into HASHDEFS.
-Don't use `grep' or `projectile-ripgrep', because those sonuvabitch finish hooks are not reliable."
+  "Get all top definitions in FILE and put into HASHDEFS."
   (with-current-buffer (find-file-noselect file)
-    (save-excursion
-      (goto-char 0)
-      (let ((reg-type (elisp-depmap-secondhelp--generateregexfromalist elisp-depmap-parse-function-shapes)))
-        ;;(reg-vnam "\\(-*\\w+\\)+"))
-        (while (search-forward-regexp reg-type nil t)
-          ;; Get type
-          (let* ((type-end (point))
-                 (type-beg (1+ (move-beginning-of-line 1)))
-                 (type-nam (buffer-substring-no-properties type-beg type-end)))
-            (goto-char type-end)
-            (forward-whitespace 1)
-            ;; Get variable name
-            (let* ((vnam-beg (point))
-                   (vnam-end (progn (forward-whitespace 1) (forward-whitespace -1) (point)))
-                   (vnam-nam (buffer-substring-no-properties vnam-beg vnam-end)))
-              ;; Get bounds or line number
-              (let ((lnum-beg (line-number-at-pos))
-                    (lnum-end nil))
-                (when (string= type-nam "defun")
-                  (move-beginning-of-line 1)
-                  (let* ((bounk (funcall show-paren-data-function))
-                         (keybl (nth 3 bounk)))
-                    (goto-char keybl)
-                    (setq lnum-end (line-number-at-pos))))
-                (puthash vnam-nam
-                         `(:type ,type-nam
-                                 :line-beg ,lnum-beg
-                                 :line-end ,lnum-end
-                                 :file ,file
-                                 ;; when mentions is nil, somehow all entries in
-                                 ;; the hash table point to the same mentions.
-                                 :mentions (,vnam-nam))
-                         hashdefs)))))
-        hashdefs))))
+    (save-restriction
+      (widen)
+      (save-excursion
+        (goto-char 1)
+        (let (sexp)
+          (condition-case err
+              (while (setq sexp (read (current-buffer)))
+                (when (assq (car sexp) elisp-depmap-parse-function-shapes)
+                  (let ((type-nam (symbol-name (car sexp)))
+                        (vnam-nam (symbol-name (cadr sexp)))
+                        (lnum-beg (save-excursion (backward-sexp) (line-number-at-pos)))
+                        (lnum-end (line-number-at-pos))) ; Do we really only want this for defuns?
+                    (puthash vnam-nam
+                             (list :type type-nam
+                                   :name vnam-nam
+                                   :line-beg lnum-beg
+                                   :line-end (when (equal type-nam "defun") lnum-end)
+                                   :file file
+                                   :mentions (list vnam-nam))
+                             hashdefs))))
+            (end-of-file (ignore)))))))
+  hashdefs)
 
 
 (defun elisp-depmap-parse--alltopdefs-filelist (filelist)
