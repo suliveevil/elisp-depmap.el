@@ -41,7 +41,7 @@
 (defsubst elisp-depmap-secondhelp--generateregexfromalist (alist)
   "From ALIST, get the car variables and put them in a regex.
 This will be used to scan all files for top level definitions."
-  (concat "^(\\(cl-\\)?\\(" (mapconcat (lambda (x) (format "%s" (car x)))
+  (concat "^(\\(cl-\\)?\\(" (mapconcat (lambda (x) (symbol-name (car x)))
                                        alist "\\|") "\\)"))
 
 (defun elisp-depmap-secondhelp--callingfuncatline (lnum file list-asc)
