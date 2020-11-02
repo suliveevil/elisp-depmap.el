@@ -29,6 +29,7 @@
 ;;; Code:
 (require 'elisp-depmap-secondhelp)
 (require 'paren)
+(require 'dash)
 
 (defcustom elisp-depmap-parse-function-shapes
   '((setq . underline) (setq-local . underline)
@@ -137,26 +138,6 @@ Only forms of the types listed in
       (elisp-depmap-parse--alltopdefs-file pfile hashtable))))
 
 
-
-(defun elisp-depmap-parse--allsecondarydefs-file (file hashtable)
-  "Get all secondary definitions in FILE for each of the top level definitions in HASHTABLE."
-  (let ((funcs-by-line-asc (elisp-depmap-secondhelp--makesortedlinelist
-                            hashtable)))
-    ;; -- Check each top def in the buffer
-    (with-current-buffer (find-file-noselect file)
-      (maphash   ;; iterate hashtable
-       (lambda (vname annotations)
-         (elisp-depmap-secondhelp--updatementionslist vname
-                                                      file
-                                                      annotations
-                                                      funcs-by-line-asc))
-       hashtable))))
-
-
-(defun elisp-depmap-parse--allsecondarydefs-filelist (filelist hashtable)
-  "Get all secondary definitions for all files in FILELIST for the top level definitions in HASHTABLE."
-  (dolist (pfile filelist hashtable)
-    (elisp-depmap-parse--allsecondarydefs-file pfile hashtable)))
 
 
 (defun elisp-depmap-parse--shuffle (lst seed)

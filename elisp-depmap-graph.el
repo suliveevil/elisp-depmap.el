@@ -26,6 +26,7 @@
 
 ;;; Code:
 (require 'elisp-depmap-parse)
+(require 'dash)
 (require 'subr-x)
 (require 'seq)
 

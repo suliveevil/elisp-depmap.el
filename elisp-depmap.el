@@ -30,6 +30,7 @@
 (require 'elisp-depmap-graph)
 (require 'elisp-depmap-exec)
 
+(require 'dash)
 (require 'org-table)
 (require 'subr-x)
 
