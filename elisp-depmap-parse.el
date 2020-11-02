@@ -90,7 +90,8 @@ loaded in the current buffer and point be in the correct place.
 Only forms of the types listed in
 `elisp-depmap-parse-function-shapes' are stored in HASHDEFS."
   (condition-case eof-err
-      (let* ((form (read (current-buffer)))
+      (let* ((read-with-symbol-positions t)
+             (form (read (current-buffer)))
              (end-pos (point)))
         (if (assq (car form) elisp-depmap-parse-function-shapes)
           (let ((type-nam (symbol-name (car form)))
@@ -104,6 +105,9 @@ Only forms of the types listed in
                               :line-end nil
                               :sexp nil
                               :file file
+                              :uses (mapcar (lambda (sym-pos)
+                                              (symbol-name (car sym-pos)))
+                                            read-symbol-positions-list)
                               :mentions (list vnam-nam)))
             (when (memq (car form) '(defun cl-defun))
               (setq props (plist-put props :sexp form))
@@ -174,8 +178,15 @@ Randomise `proj-files' using SEED (default 0)."
   (let* ((proj-files (elisp-depmap-parse--shuffle
                       (elisp-depmap-parse--getsourcefiles)
                       (or seed 0)))
-         (hash-table (elisp-depmap-parse--alltopdefs-filelist proj-files)))
-    (elisp-depmap-parse--allsecondarydefs-filelist proj-files hash-table)
+         (hash-table (elisp-depmap-parse--alltopdefs-filelist proj-files))
+         (tracked (hash-table-keys hash-table)))
+    (maphash (lambda (name props)
+               (dolist (used (cl-intersection (plist-get props :uses) tracked))
+                 (let* ((otherprops (gethash used hash-table))
+                        (mentions (plist-get otherprops :mentions)))
+                   (cl-pushnew name mentions)
+                   (puthash used (plist-put otherprops :mentions mentions) hash-table))))
+             hash-table)
     hash-table))
 
 (provide 'elisp-depmap-parse)
