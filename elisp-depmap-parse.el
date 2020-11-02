@@ -83,6 +83,36 @@ More info at the https://graphviz.org/doc/info/attrs.html website."
 ;;                      hashdefs)
 ;;           (error "Unable to find provides for file %s" file))))))
 
+(defun elisp-depmap-parse--topdef (file hashdefs)
+  "Parse one toplevel form from point of current buffer.
+Store it as belonging to FILE in HASHDEFS.  FILE shall already be
+loaded in the current buffer and point be in the correct place.
+Only forms of the types listed in
+`elisp-depmap-parse-function-shapes' are stored in HASHDEFS."
+  (condition-case eof-err
+      (let* ((form (read (current-buffer)))
+             (end-pos (point)))
+        (if (assq (car form) elisp-depmap-parse-function-shapes)
+          (let ((type-nam (symbol-name (car form)))
+                (vnam-nam (symbol-name (cadr form)))
+                (lnum-beg (save-excursion (backward-sexp) (line-number-at-pos)))
+                (lnum-end (line-number-at-pos end-pos))
+                props)
+            (setq props (list :type type-nam
+                              :name vnam-nam
+                              :line-beg lnum-beg
+                              :line-end nil
+                              :sexp nil
+                              :file file
+                              :mentions (list vnam-nam)))
+            (when (memq (car form) '(defun cl-defun))
+              (setq props (plist-put props :sexp form))
+              (setq props (plist-put props :line-end lnum-end)))
+            (puthash vnam-nam props hashdefs))
+          :ignored ; read a form but ignored it.  Still return non-nil
+          ))
+    (end-of-file (ignore))))
+
 (defun elisp-depmap-parse--alltopdefs-file (file hashdefs)
   "Get all top definitions in FILE and put into HASHDEFS."
   (with-current-buffer (find-file-noselect file)
@@ -90,25 +120,8 @@ More info at the https://graphviz.org/doc/info/attrs.html website."
       (widen)
       (save-excursion
         (goto-char 1)
-        (let (sexp)
-          (condition-case err
-              (while (setq sexp (read (current-buffer)))
-                (when (assq (car sexp) elisp-depmap-parse-function-shapes)
-                  (let ((type-nam (symbol-name (car sexp)))
-                        (vnam-nam (symbol-name (cadr sexp)))
-                        (lnum-beg (save-excursion (backward-sexp) (line-number-at-pos)))
-                        (lnum-end (line-number-at-pos))) ; Do we really only want this for defuns?
-                    (puthash vnam-nam
-                             (list :type type-nam
-                                   :name vnam-nam
-                                   :line-beg lnum-beg
-                                   :line-end (when (equal type-nam "defun") lnum-end)
-                                   :file file
-                                   :mentions (list vnam-nam))
-                             hashdefs))))
-            (end-of-file (ignore)))))))
-  hashdefs)
-
+        (while (elisp-depmap-parse--topdef file hashdefs))
+        hashdefs))))
 
 (defun elisp-depmap-parse--alltopdefs-filelist (filelist)
   "Get all top definitions from FILELIST and return a hashtable, with variable names as keys as well as type and bounds as values."
